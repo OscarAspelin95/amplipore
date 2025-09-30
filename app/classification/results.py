@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+from plotly.graph_objects import Figure
 
 
 @unique
@@ -79,11 +81,78 @@ def parse_sintax_tsv(tsv: Path, threshold: float) -> pd.DataFrame:
     return result_df
 
 
+def get_sankey_fig(df: pd.DataFrame) -> Figure:
+    levels = Levels.as_list()[::-1]
+    edges = []
+
+    for i in range(len(levels) - 1):
+        src_col, tgt_col = levels[i], levels[i + 1]
+
+        edges += df[[src_col, tgt_col]].values.tolist()
+
+    # Convert to DataFrame for counting connections
+    edges_df = pd.DataFrame(edges, columns=["source", "target"])
+    edges_count = edges_df.value_counts().reset_index(name="value")
+
+    # Build unique nodes
+    all_nodes = pd.Index(
+        pd.concat([edges_count["source"], edges_count["target"]]).unique()
+    )
+
+    # Map labels to indices
+    node_map = {label: i for i, label in enumerate(all_nodes)}
+
+    # Build Sankey link data
+    sources = edges_count["source"].map(node_map)
+    targets = edges_count["target"].map(node_map)
+    values = edges_count["value"]
+
+    # Create Sankey diagram
+    fig = go.Figure(
+        go.Sankey(
+            node=dict(
+                pad=15,
+                thickness=20,
+                label=all_nodes.tolist(),
+            ),
+            link=dict(source=sources, target=targets, value=values),
+        )
+    )
+
+    fig.update_layout(title_text="Taxonomy Saneky Diagram", font_size=10)
+    return fig
+
+
+def pivot_df(df: pd.DataFrame) -> pd.DataFrame:
+    pivoted_df = (
+        df.pivot(columns="level", index="asv", values="hit").reset_index().dropna()
+    )
+
+    for level in Levels.as_list():
+        pivoted_df[level] = pivoted_df[level].apply(lambda x: f"{level[0]}:{x}")
+
+    return pivoted_df
+
+
+def plot_sankey_diagram(df: pd.DataFrame, outdir: Path):
+    fig = get_sankey_fig(df)
+    fig.show()
+    fig.write_html(outdir / "sankey.html")
+
+
+def sankey_diagram(parsed_df: pd.DataFrame, outdir: Path):
+    pivoted_df = pivot_df(parsed_df)
+    plot_sankey_diagram(pivoted_df, outdir)
+
+
 def get_results(
     sintax_tsv: Path, otutab_tsv: Path, threshold: float, outdir: Path
 ) -> pd.DataFrame:
     parsed_df = parse_sintax_tsv(sintax_tsv, threshold)
     parsed_df.to_csv(outdir / "parsed.tsv", sep="\t", index=False)
+
+    # Currently, don't consider abundance.
+    sankey_diagram(parsed_df, outdir)
 
     otutab_df = pd.read_csv(otutab_tsv, sep="\t")
     total_reads = otutab_df["reads"].sum()

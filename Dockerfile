@@ -20,9 +20,12 @@ RUN apt-get update && apt-get install -y wget \
 
 FROM python:3.13.7-bookworm
 
-ENV USEARCH_VERSION="12.0-beta"
+ENV USEARCH_VERSION="12.0-beta" \
+    DASH_PORT="8000"
 
 WORKDIR /usr/src/app
+
+EXPOSE ${DASH_PORT}
 
 COPY --from=builder /usr/local/bin/sintax_rs /usr/local/bin/sintax_rs
 COPY --from=builder /usr/local/bin/fastq_rs /usr/local/bin/fastq_rs

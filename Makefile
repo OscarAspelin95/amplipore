@@ -1,10 +1,10 @@
 .PHONY: build bash clean
 
 build:
-	docker build -t test-amplicon-16s .
+	docker build -t amplipore .
 
 bash:
-	docker run -v ./app:/usr/src/app/ -v ./data:/usr/src/data/ -it --rm test-amplicon-16s /bin/bash
+	docker run -v ./app:/usr/src/app/ -v ./data:/usr/src/data/ -p 8000:8000 -it --rm amplipore /bin/bash
 
 clean:
-	docker system prune -a -f --volumes
+	docker system prune --volumes -f
