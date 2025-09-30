@@ -38,4 +38,15 @@ Optional arguments:
 
 ## Output Files
 
-All result files are generated in the `outdir` directory.
+All result files are generated in the `outdir` directory:
+
+- `asv.fasta` - contains the amplicon sequence variants that were identified.
+- `otutab.tsv` - number of reads corresponding to each asv.
+- `sintax.tsv` - raw sintax results.
+- `parsed.tsv` - the parsed sintax results, used to generate plots.
+
+### Dash interactive sankey diagram
+
+Amplipore uses dash and plotly to generate interactive plots. To spin up an interactive sankey diagram, use:
+
+`python dash_sankey.py --parsed_tsv <path/to/parsed.tsv>`
