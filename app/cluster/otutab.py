@@ -1,11 +1,9 @@
-from common.decorator import with_yaspin
 from pathlib import Path
 from Bio import SeqIO
 import re
 import pandas as pd
 
 
-@with_yaspin("Getting asvs...")
 def get_otutab(centroids: Path, outdir: Path) -> tuple[Path, Path]:
     size_pat = re.compile(r"size=(?P<size>\d+);$")
 
@@ -24,10 +22,10 @@ def get_otutab(centroids: Path, outdir: Path) -> tuple[Path, Path]:
         rec.id = asv
         rec.description = ""
 
+        # Skip singletons.
         if size <= 1:
             break
 
-        #
         otutab_lst.append([asv, size])
         recs.append(rec)
 

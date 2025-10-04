@@ -21,7 +21,8 @@ RUN apt-get update && apt-get install -y wget \
 FROM python:3.13.7-bookworm
 
 ENV USEARCH_VERSION="12.0-beta" \
-    DASH_PORT="8000"
+    DASH_PORT="8000" \
+    BLAST_VERSION="2.2.31"
 
 WORKDIR /usr/src/app
 
@@ -32,5 +33,14 @@ COPY --from=builder /usr/local/bin/fastq_rs /usr/local/bin/fastq_rs
 
 COPY ./requirements.txt requirements.txt
 RUN apt-get update && apt-get install -y curl && pip install -r requirements.txt \
+    && mkdir -p /usr/src/deps \
+    # Usearch
+    && cd /usr/src/deps \
     && wget https://github.com/rcedgar/usearch12/releases/download/v"${USEARCH_VERSION}"1/usearch_linux_x86_"${USEARCH_VERSION}" \
-    && chmod +x ./usearch_linux_x86_"${USEARCH_VERSION}" && mv ./usearch_linux_x86_"${USEARCH_VERSION}" /usr/local/bin/usearch
+    && chmod +x ./usearch_linux_x86_"${USEARCH_VERSION}" && mv ./usearch_linux_x86_"${USEARCH_VERSION}" /usr/local/bin/usearch \
+    # BLAST
+    && wget https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/"${BLAST_VERSION}"/ncbi-blast-"${BLAST_VERSION}"+-x64-linux.tar.gz \
+    && tar -xf ncbi-blast-"${BLAST_VERSION}"+-x64-linux.tar.gz \
+    && cp ncbi-blast-"${BLAST_VERSION}"+/bin/* /usr/local/bin/ \
+    #
+    && rm -r /usr/src/deps

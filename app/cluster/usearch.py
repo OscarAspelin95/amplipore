@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 from pathlib import Path
 from sh import usearch
-from common.decorator import with_yaspin
 
 
 class UsearchConfig(BaseModel):
@@ -9,7 +8,6 @@ class UsearchConfig(BaseModel):
     pident: float = 0.80
 
 
-@with_yaspin("Running read clustering...")
 def usearch_cluster(fasta: Path, outdir: Path) -> Path:
     cfg = UsearchConfig()
 

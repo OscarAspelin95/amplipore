@@ -7,6 +7,7 @@ from cluster.main import cluster
 from classification.main import classify
 import sys
 import pandas as pd
+from blast.main import run_blast
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.append(str(PROJECT_ROOT))
@@ -32,6 +33,10 @@ def run_sample(
 
     # Cluster reads into asvs.
     asv_fasta, otutab_tsv = cluster(fasta, sample_dir)
+
+    # BLAST classification
+    blast_df = run_blast(asv_fasta, database, sample_dir)
+    blast_df.to_csv(sample_dir / "blast_hits.tsv", sep="\t")
 
     # Classify asvs.
     agg_df = classify(asv_fasta, otutab_tsv, database, sintax_threshold, sample_dir)

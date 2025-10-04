@@ -2,8 +2,10 @@ from pathlib import Path
 from .sintax import run_sintax
 from .results import get_results
 import pandas as pd
+from common.decorator import with_yaspin
 
 
+@with_yaspin("Running SINTAX classification...")
 def classify(
     asv_fasta: Path,
     otutab_tsv: Path,
