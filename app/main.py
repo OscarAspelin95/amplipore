@@ -22,6 +22,7 @@ def run_sample(
     fastq: Path,
     database: Path,
     sintax_threshold: float,
+    blast: bool,
     outdir: Path,
 ) -> pd.DataFrame:
     sample_name = get_file_base(fastq, ALLOWED_FASTQ_ENDINGS)
@@ -35,8 +36,13 @@ def run_sample(
     asv_fasta, otutab_tsv = cluster(fasta, sample_dir)
 
     # BLAST classification
-    blast_df = run_blast(asv_fasta, database, sample_dir)
-    blast_df.to_csv(sample_dir / "blast_hits.tsv", sep="\t")
+    match blast:
+        case True:
+            log.info("Running BLAST classification.")
+            blast_df = run_blast(asv_fasta, database, sample_dir)
+            blast_df.to_csv(sample_dir / "blast_hits.tsv", sep="\t")
+        case False:
+            log.info("Skipping BLAST classification.")
 
     # Classify asvs.
     agg_df = classify(asv_fasta, otutab_tsv, database, sintax_threshold, sample_dir)
@@ -49,10 +55,11 @@ def main(
     fastqs: list[Path],
     database: Path,
     sintax_threshold: float,
+    blast: bool,
     outdir: Path,
 ) -> None:
     for fastq in fastqs:
-        run_sample(fastq, database, sintax_threshold, outdir)
+        run_sample(fastq, database, sintax_threshold, blast, outdir)
 
 
 if __name__ == "__main__":
@@ -69,6 +76,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "-s", "--sintax_threshold", type=float, required=False, default=0.80
     )
+    parser.add_argument(
+        "--blast", action="store_true", help="Run additional classifiction with BLAST"
+    )
     args = parser.parse_args()
 
     fastq = [_file(fastq, ALLOWED_FASTQ_ENDINGS) for fastq in args.fastq]
@@ -79,4 +89,4 @@ if __name__ == "__main__":
     outdir = Path(args.outdir)
     outdir.mkdir(exist_ok=True)
 
-    main(fastq, database, sintax_threshold, outdir)
+    main(fastq, database, sintax_threshold, args.blast, outdir)

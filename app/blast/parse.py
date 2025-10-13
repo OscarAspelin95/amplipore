@@ -2,7 +2,6 @@ import pandas as pd
 from pathlib import Path
 import logging
 from .config import ParseConfig
-from common.decorator import with_yaspin
 
 log = logging.getLogger(__name__)
 

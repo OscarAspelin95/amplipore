@@ -3,12 +3,13 @@ from typing import Callable, TypeVar, ParamSpec
 from functools import wraps
 import time
 
+
 T = TypeVar("Type")
 P = ParamSpec("ParamSpec")
 
 
 def with_yaspin(progress_text: str, color: str = "cyan") -> Callable[P, T]:
-    """Function decorator that adds a progress spinner."""
+    """Decorator that adds a progress spinner."""
 
     def with_progress(func: Callable[P, T]) -> Callable[P, T]:
         @wraps(func)
