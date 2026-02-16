@@ -1,6 +1,7 @@
 from sh import sintax_rs
 from pathlib import Path
 from pydantic import BaseModel
+from common.decorator import with_yaspin
 
 
 class SintaxConfig(BaseModel):
@@ -9,6 +10,7 @@ class SintaxConfig(BaseModel):
     kmer_size: int = 15
 
 
+@with_yaspin("Running SINTAX classification...")
 def run_sintax(asv_fasta: Path, database: Path, outdir: Path) -> Path:
     cfg = SintaxConfig()
 

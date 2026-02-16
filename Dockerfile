@@ -1,20 +1,21 @@
 FROM rust:1.90.0-bullseye AS builder
 
-ENV SINTAX_RS_VERSION="0.0.1" \
-	FASTQ_RS_VERSION="0.0.2"
+ENV SINTAX_RS_VERSION="v0.0.1" \
+	FASTQ_RS_VERSION="v0.0.2"
 
-# Compile Rust dependencies.
-RUN apt-get update && apt-get install -y wget \
-	&& mkdir -p /usr/src/deps \
+# Compile Rust dependencies from source with SIMD acceleration.
+RUN apt-get update && apt-get install -y git \
 	# sintax_rs
-	&& cd /usr/src/deps \
-	&& wget https://github.com/OscarAspelin95/sintax_rs/releases/download/v${SINTAX_RS_VERSION}/sintax_rs-v${SINTAX_RS_VERSION}-x86_64-unknown-linux-gnu.tar.gz \
-	&& tar -xf sintax_rs-v${SINTAX_RS_VERSION}-x86_64-unknown-linux-gnu.tar.gz && mv ./sintax_rs /usr/local/bin/sintax_rs \
+	&& git clone --branch ${SINTAX_RS_VERSION} --depth 1 https://github.com/OscarAspelin95/sintax_rs.git /usr/src/sintax_rs \
+	&& cd /usr/src/sintax_rs \
+	&& RUSTFLAGS="-C target-cpu=native" cargo build --release \
+	&& cp target/release/sintax_rs /usr/local/bin/sintax_rs \
 	# fastq_rs
-	&& cd /usr/src/deps \
-	&& wget https://github.com/OscarAspelin95/fastq_rs/releases/download/v${FASTQ_RS_VERSION}/fastq_rs-v${FASTQ_RS_VERSION}-x86_64-unknown-linux-gnu.tar.gz \
-	&& tar -xf fastq_rs-v${FASTQ_RS_VERSION}-x86_64-unknown-linux-gnu.tar.gz && mv ./fastq_rs /usr/local/bin/fastq_rs \
-	&& rm -r /usr/src/deps
+	&& git clone --branch ${FASTQ_RS_VERSION} --depth 1 https://github.com/OscarAspelin95/fastq_rs.git /usr/src/fastq_rs \
+	&& cd /usr/src/fastq_rs \
+	&& RUSTFLAGS="-C target-cpu=native" cargo build --release \
+	&& cp target/release/fastq_rs /usr/local/bin/fastq_rs \
+	&& rm -rf /usr/src/sintax_rs /usr/src/fastq_rs
 
 
 FROM python:3.13.7-bookworm
@@ -30,8 +31,15 @@ EXPOSE ${DASH_PORT}
 COPY --from=builder /usr/local/bin/sintax_rs /usr/local/bin/sintax_rs
 COPY --from=builder /usr/local/bin/fastq_rs /usr/local/bin/fastq_rs
 
-COPY ./requirements.txt requirements.txt
-RUN apt-get update && apt-get install -y curl && pip install -r requirements.txt \
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+ENV PATH="/usr/src/app/.venv/bin:$PATH"
+
+COPY ./pyproject.toml ./uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project \
+	&& apt-get update && apt-get install -y curl wget \
 	&& mkdir -p /usr/src/deps \
 	# Usearch
 	&& cd /usr/src/deps \

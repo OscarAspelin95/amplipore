@@ -1,0 +1,15 @@
+[project]
+name = "amplipore"
+version = "0.1.0"
+description = "16S amplicon classification pipeline for Oxford Nanopore reads"
+requires-python = ">=3.13"
+dependencies = [
+    "yaspin>=3.4.0",
+    "sh>=2.2.2",
+    "biopython>=1.86",
+    "pandas>=2.3.3",
+    "plotly>=6.5.0",
+    "nbformat>=5.10.4",
+    "pydantic>=2.12.5",
+    "dash>=3.3.0",
+]

@@ -1,29 +1,10 @@
-from enum import Enum, unique
 from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.graph_objects import Figure
-
-
-@unique
-class Levels(Enum):
-    SPECIES = "species"
-    GENUS = "genus"
-    FAMILY = "family"
-    ORDER = "order"
-    CLASS = "class"
-    PHYLUM = "phylum"
-    KINGDOM = "kingdom"
-
-    @classmethod
-    def as_list(cls) -> list[str]:
-        return [c.value for c in cls]
-
-    @classmethod
-    def pandas_column_rename(cls) -> dict[int, str]:
-        return {i: c for i, c in enumerate(cls.as_list()[::-1])}
+from common.taxonomy import Levels
 
 
 def parse_sintax_tsv(tsv: Path, threshold: float) -> pd.DataFrame:
@@ -119,7 +100,7 @@ def get_sankey_fig(df: pd.DataFrame) -> Figure:
         )
     )
 
-    fig.update_layout(title_text="Taxonomy Saneky Diagram", font_size=10)
+    fig.update_layout(title_text="Taxonomy Sankey Diagram", font_size=10)
     return fig
 
 
@@ -134,24 +115,55 @@ def pivot_df(df: pd.DataFrame) -> pd.DataFrame:
     return pivoted_df
 
 
-def plot_sankey_diagram(df: pd.DataFrame, outdir: Path):
-    fig = get_sankey_fig(df)
-    fig.show()
+def sankey_diagram(parsed_df: pd.DataFrame, outdir: Path):
+    pivoted_df = pivot_df(parsed_df)
+    fig = get_sankey_fig(pivoted_df)
     fig.write_html(outdir / "sankey.html")
 
 
-def sankey_diagram(parsed_df: pd.DataFrame, outdir: Path):
-    pivoted_df = pivot_df(parsed_df)
-    plot_sankey_diagram(pivoted_df, outdir)
+def get_unclassified_asvs(parsed_df: pd.DataFrame) -> set[str]:
+    """Return ASV IDs where all 7 taxonomy levels are 'unclassified'."""
+    levels = Levels.as_list()
+    unclassified = set()
+
+    for asv, group in parsed_df.groupby("asv"):
+        hits = group.set_index("level")["hit"]
+        if all(hits.get(level, "unclassified") == "unclassified" for level in levels):
+            unclassified.add(asv)
+
+    return unclassified
+
+
+def merge_blast_results(parsed_df: pd.DataFrame, blast_df: pd.DataFrame) -> pd.DataFrame:
+    """Replace 'unclassified' entries in SINTAX results with BLAST taxonomy for matched ASVs."""
+    if blast_df.empty:
+        return parsed_df
+
+    levels = Levels.as_list()
+    new_rows = []
+
+    for _, row in blast_df.iterrows():
+        asv = row["asv"]
+        for level in levels:
+            value = row.get(level, "unclassified")
+            new_rows.append({"asv": asv, "level": level, "hit": value, "score": None})
+
+    blast_parsed = pd.DataFrame(new_rows)
+
+    # Remove the unclassified SINTAX rows for ASVs that BLAST classified.
+    blast_asvs = set(blast_df["asv"])
+    kept = parsed_df[~parsed_df["asv"].isin(blast_asvs)]
+
+    return pd.concat([kept, blast_parsed], ignore_index=True)
 
 
 def get_results(
-    sintax_tsv: Path, otutab_tsv: Path, threshold: float, outdir: Path
+    parsed_df: pd.DataFrame,
+    otutab_tsv: Path,
+    outdir: Path,
 ) -> pd.DataFrame:
-    parsed_df = parse_sintax_tsv(sintax_tsv, threshold)
     parsed_df.to_csv(outdir / "parsed.tsv", sep="\t", index=False)
 
-    # Currently, don't consider abundance.
     sankey_diagram(parsed_df, outdir)
 
     otutab_df = pd.read_csv(otutab_tsv, sep="\t")

@@ -1,52 +1,82 @@
 # amplipore
 
-Amplicon analysis of Oxford Nanopore 16S V1V9 sequences.
+16S V1-V9 amplicon classification pipeline for Oxford Nanopore reads.
 
-## Requirements
+Reads are preprocessed with [fastq_rs](https://github.com/OscarAspelin95/fastq_rs), clustered with [USEARCH12](https://github.com/rcedgar/usearch12), and classified with [sintax_rs](https://github.com/OscarAspelin95/sintax_rs). Optionally, unclassified ASVs are re-classified with [BLAST](https://blast.ncbi.nlm.nih.gov/Blast.cgi).
 
-- Docker Engine
+## Quick start (Docker)
 
-## Installation
+```bash
+make build
+make bash
+```
 
-Clone the repository or download the source code.
+Inside the container, all commands are run from `/usr/src/app/` (the `app/` directory is volume-mounted). The `data/` directory is mounted at `/usr/src/data/`.
 
-Build image with `make build`.
+## Quick start (local)
 
-## Usage
+Requires [uv](https://docs.astral.sh/uv/), plus the following binaries on `PATH`: `sintax_rs`, `fastq_rs`, `usearch`, `blastn`, `makeblastdb`.
 
-All commands need to be run inside the container. Use `make bash` for this.
+```bash
+uv sync
+cd app
+```
 
-The directories `app` (sourcecode) and `data` (put files here) are volume-mounted into the container.
+All commands below should be run from the `app/` directory using `uv run`.
 
-## Building database
+## Building the database
 
-Use `database.py` to download the database, which is a reformatted version of the [EMU](https://github.com/treangenlab/emu) database.
+Download and format the [EMU](https://github.com/treangenlab/emu) reference database:
 
-`python database.py --outdir <outdir>`
+```bash
+# Docker:
+python database.py -o /usr/src/data
 
-## Classification
+# Local:
+uv run python database.py -o ../data
+```
 
-The reads are preprocessed with [fastq_rs](https://github.com/OscarAspelin95/fastq_rs), clustered with [USEARCH12](https://github.com/rcedgar/usearch12) and classified with [sintax_rs](https://github.com/OscarAspelin95/sintax_rs).
+## Running the pipeline
 
-`python main.py --fastq <reads.fastq.gz> [...] --database <db.fasta> --outdir <outdir>`
+```bash
+# Docker:
+python main.py -f /usr/src/data/reads.fastq.gz -d /usr/src/data/database.fasta -o /usr/src/data/output
 
-Optional arguments:
+# Local:
+uv run python main.py -f ../data/reads.fastq.gz -d ../data/database.fasta -o ../data/output
+```
 
-<pre>
-<b>-s/--sintax_threshold</b> [0.80] - Threshold for assigning a taxonomic level.
-</pre>
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-f/--fastq` | Input FASTQ file(s) | required |
+| `-d/--database` | Reference database FASTA | required |
+| `-o/--outdir` | Output directory | required |
+| `-s/--sintax_threshold` | Confidence threshold for taxonomic assignment | `0.80` |
+| `--blast` | Run BLAST on ASVs that SINTAX could not classify | off |
+| `--blast-pident` | BLAST percent identity threshold (0.0-1.0) | `0.70` |
+| `--blast-qcov` | BLAST query coverage threshold (0.0-1.0) | `0.70` |
 
-## Output Files
+## Output files
 
-All result files are generated in the `outdir` directory:
+| File | Description |
+|------|-------------|
+| `asv.fasta` | Amplicon sequence variants |
+| `otutab.tsv` | Read counts per ASV |
+| `sintax.tsv` | Raw SINTAX results |
+| `parsed.tsv` | Parsed classification results |
+| `blast.tsv` | Raw BLAST results (when `--blast` is used) |
+| `blast_hits.tsv` | Parsed BLAST hits (when `--blast` is used) |
+| `sankey.html` | Taxonomy Sankey diagram |
+| `abundance_perc.html` | Relative abundance bar chart |
 
-- `asv.fasta` - contains the amplicon sequence variants that were identified.
-- `otutab.tsv` - number of reads corresponding to each asv.
-- `sintax.tsv` - raw sintax results.
-- `parsed.tsv` - the parsed sintax results, used to generate plots.
+## Interactive Sankey diagram
 
-### Dash interactive sankey diagram
+```bash
+# Docker:
+python dash_sankey.py --parsed_tsv /usr/src/data/output/<sample>/parsed.tsv
 
-Amplipore uses dash and plotly to generate interactive plots. To spin up an interactive sankey diagram, use:
+# Local:
+uv run python dash_sankey.py --parsed_tsv ../data/output/<sample>/parsed.tsv
+```
 
-`python dash_sankey.py --parsed_tsv <path/to/parsed.tsv>`
+Opens a Dash app on port `8000` with a threshold slider for exploring classifications.

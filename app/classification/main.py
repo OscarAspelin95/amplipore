@@ -1,20 +1,20 @@
 from pathlib import Path
-from .sintax import run_sintax
-from .results import get_results
+from .results import get_results, parse_sintax_tsv, merge_blast_results
 import pandas as pd
 from common.decorator import with_yaspin
 
 
-@with_yaspin("Running SINTAX classification...")
+@with_yaspin("Generating classification results...")
 def classify(
-    asv_fasta: Path,
+    sintax_tsv: Path,
     otutab_tsv: Path,
-    database: Path,
     sintax_threshold: float,
     outdir: Path,
+    blast_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    sintax_tsv = run_sintax(asv_fasta, database, outdir)
+    parsed_df = parse_sintax_tsv(sintax_tsv, sintax_threshold)
 
-    agg_df = get_results(sintax_tsv, otutab_tsv, sintax_threshold, outdir)
+    if blast_df is not None:
+        parsed_df = merge_blast_results(parsed_df, blast_df)
 
-    return agg_df
+    return get_results(parsed_df, otutab_tsv, outdir)
