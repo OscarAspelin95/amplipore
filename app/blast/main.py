@@ -1,4 +1,3 @@
-from .config import BlastnConfig
 from .parse import parse_blast_tsv
 from sh import blastn, makeblastdb, RunningCommand
 from pathlib import Path
@@ -17,7 +16,15 @@ def run_makeblastdb(db_fasta: Path, db_dir: Path) -> Path:
     return nucl_db
 
 
-def run_blastn(asv_fasta: Path, nucl_db: Path, outdir: Path, cfg: BlastnConfig) -> Path:
+def run_blastn(
+    asv_fasta: Path,
+    nucl_db: Path,
+    outdir: Path,
+    pident: float,
+    qcov: float,
+    threads: int,
+    word_size: int = 11,
+) -> Path:
     blast_tsv = outdir / "blast.tsv"
     rc: RunningCommand = blastn(
         "-query",
@@ -25,13 +32,13 @@ def run_blastn(asv_fasta: Path, nucl_db: Path, outdir: Path, cfg: BlastnConfig) 
         "-db",
         nucl_db,
         "-num_threads",
-        cfg.threads,
+        threads,
         "-qcov_hsp_perc",
-        int(cfg.qcov * 100),
+        int(qcov * 100),
         "-word_size",
-        cfg.word_size,
+        word_size,
         "-perc_identity",
-        int(cfg.pident * 100),
+        int(pident * 100),
         "-out",
         blast_tsv,
         "-outfmt",
@@ -52,14 +59,13 @@ def run_blast(
     asv_fasta: Path,
     db_fasta: Path,
     outdir: Path,
-    blast_pident: float = 0.70,
-    blast_qcov: float = 0.70,
+    pident: float = 0.70,
+    qcov: float = 0.70,
+    threads: int = 8,
 ) -> pd.DataFrame:
-    cfg = BlastnConfig(pident=blast_pident, qcov=blast_qcov)
-
     # Build BLAST DB in a temp directory (cleaned up automatically).
     with tempfile.TemporaryDirectory() as tmpdir:
         nucl_db = run_makeblastdb(db_fasta, Path(tmpdir))
-        blast_tsv = run_blastn(asv_fasta, nucl_db, outdir, cfg)
+        blast_tsv = run_blastn(asv_fasta, nucl_db, outdir, pident, qcov, threads)
 
-    return parse_blast_tsv(blast_tsv, blast_pident, blast_qcov)
+    return parse_blast_tsv(blast_tsv, pident, qcov)

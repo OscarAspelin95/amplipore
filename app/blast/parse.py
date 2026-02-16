@@ -1,7 +1,6 @@
 import pandas as pd
 from pathlib import Path
 import logging
-from .config import ParseConfig
 from common.taxonomy import Levels, TAXONOMY_PREFIXES
 
 log = logging.getLogger(__name__)
@@ -46,7 +45,6 @@ def extract_taxonomy(subject_id: str) -> dict[str, str]:
 
 
 def parse_blast_tsv(blast_tsv: Path, pident: float = 0.70, perc_aln: float = 0.70) -> pd.DataFrame:
-    cfg = ParseConfig(pident=pident, perc_aln=perc_aln)
     df = pd.read_csv(blast_tsv, sep="\t", names=COLS)
 
     if df.empty:
@@ -59,7 +57,7 @@ def parse_blast_tsv(blast_tsv: Path, pident: float = 0.70, perc_aln: float = 0.7
     )
 
     # Remove low quality hits.
-    df = df.query(f"pident >= {cfg.pident} and perc_aln >= {cfg.perc_aln}")
+    df = df.query(f"pident >= {pident} and perc_aln >= {perc_aln}")
 
     if df.empty:
         log.warning("No valid BLAST hits after filtering.")

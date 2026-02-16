@@ -51,10 +51,17 @@ uv run python main.py -f ../data/reads.fastq.gz -d ../data/database.fasta -o ../
 | `-f/--fastq` | Input FASTQ file(s) | required |
 | `-d/--database` | Reference database FASTA | required |
 | `-o/--outdir` | Output directory | required |
-| `-s/--sintax_threshold` | Confidence threshold for taxonomic assignment | `0.80` |
-| `--blast` | Run BLAST on ASVs that SINTAX could not classify | off |
-| `--blast-pident` | BLAST percent identity threshold (0.0-1.0) | `0.70` |
-| `--blast-qcov` | BLAST query coverage threshold (0.0-1.0) | `0.70` |
+| `--min-len` | Min FASTQ read length  | default: `1200` |
+| `--max-len` | Max FASTQ read length  | default: `1700` |
+| `--max-error` | Max allowed read error | default: `0.05` (5%) |
+| `--cluster-pident` | Percent identity to use during usearch read cluster | default: `0.80` (80%) |
+| `-s/--sintax_threshold` | Confidence threshold for taxonomic assignment | default: `0.80` (80%) |
+| `-k/--kmer-size` | sintax_rs kmer size | default: `15` |
+| `-w/--window-size` | sintax_rs window size | default: `7` |
+| `--blast` | Re-classify completely unclassified ASVs with BLAST | default: `false` |
+| `--blast-pident` | BLAST percent identity threshold (0.0-1.0) | default: `0.70` (70%) |
+| `--blast-qcov` | BLAST query coverage threshold (0.0-1.0) | default: `0.70` (70%) |
+| `--threads` | Num threads to use | default: `8` |
 
 ## Output files
 

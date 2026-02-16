@@ -1,29 +1,21 @@
-from pydantic import BaseModel
 from pathlib import Path
 from sh import usearch
 
 
-class UsearchConfig(BaseModel):
-    threads: int = 8
-    pident: float = 0.80
-
-
-def usearch_cluster(fasta: Path, outdir: Path) -> Path:
-    cfg = UsearchConfig()
-
+def usearch_cluster(fasta: Path, outdir: Path, pident: float = 0.80, threads: int = 8) -> Path:
     centroid_fasta = outdir / "centroids.fasta"
     usearch(
         "-cluster_fast",
         fasta,
         "-id",
-        cfg.pident,
+        pident,
         "-centroids",
         centroid_fasta,
         "-strand",
         "both",
         "-sizeout",
         "-threads",
-        cfg.threads,
+        threads,
     )
 
     assert centroid_fasta.is_file()
