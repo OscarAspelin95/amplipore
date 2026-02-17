@@ -1,6 +1,6 @@
 FROM rust:1.90.0-bullseye AS builder
 
-ENV SINTAX_RS_VERSION="v0.0.1" \
+ENV SINTAX_RS_VERSION="v0.0.2" \
 	FASTQ_RS_VERSION="v0.0.2"
 
 # Compile Rust dependencies from source with SIMD acceleration.
