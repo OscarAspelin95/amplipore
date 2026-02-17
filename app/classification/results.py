@@ -115,10 +115,12 @@ def pivot_df(df: pd.DataFrame) -> pd.DataFrame:
     return pivoted_df
 
 
-def sankey_diagram(parsed_df: pd.DataFrame, outdir: Path):
+def sankey_diagram(parsed_df: pd.DataFrame, outdir: Path) -> Path:
     pivoted_df = pivot_df(parsed_df)
     fig = get_sankey_fig(pivoted_df)
-    fig.write_html(outdir / "sankey.html")
+    sankey_html = outdir / "sankey.html"
+    fig.write_html(sankey_html)
+    return sankey_html
 
 
 def get_unclassified_asvs(parsed_df: pd.DataFrame) -> set[str]:
@@ -161,10 +163,11 @@ def get_results(
     parsed_df: pd.DataFrame,
     otutab_tsv: Path,
     outdir: Path,
-) -> pd.DataFrame:
-    parsed_df.to_csv(outdir / "parsed.tsv", sep="\t", index=False)
+) -> tuple[pd.DataFrame, list[Path]]:
+    parsed_tsv = outdir / "parsed.tsv"
+    parsed_df.to_csv(parsed_tsv, sep="\t", index=False)
 
-    sankey_diagram(parsed_df, outdir)
+    sankey_html = sankey_diagram(parsed_df, outdir)
 
     otutab_df = pd.read_csv(otutab_tsv, sep="\t")
     total_reads = otutab_df["reads"].sum()
@@ -195,6 +198,7 @@ def get_results(
         barmode="relative",
         color_discrete_sequence=px.colors.qualitative.Antique_r,
     )
-    fig.write_html(outdir / "abundance_perc.html")
+    abundance_html = outdir / "abundance_perc.html"
+    fig.write_html(abundance_html)
 
-    return agg_df
+    return agg_df, [parsed_tsv, sankey_html, abundance_html]

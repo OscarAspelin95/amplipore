@@ -11,7 +11,7 @@ def classify(
     sintax_threshold: float,
     outdir: Path,
     blast_df: pd.DataFrame | None = None,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, list[Path]]:
     parsed_df = parse_sintax_tsv(sintax_tsv, sintax_threshold)
 
     if blast_df is not None:

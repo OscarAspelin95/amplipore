@@ -1,6 +1,8 @@
 import argparse
 import logging
 import os
+import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -37,77 +39,86 @@ def run_sample(
     database: Path,
     outdir: Path,
     cfg: PipelineConfig,
-) -> pd.DataFrame:
-    sample_name = get_file_base(fastq, ALLOWED_FASTQ_ENDINGS)
-    sample_dir = outdir / sample_name
-    sample_dir.mkdir(exist_ok=True)
-
+) -> tuple[Path, Path, Path, Path | None, list[Path]]:
     # Preprocess and convert fastq to fasta.
     fasta = preprocess(
         fastq,
-        sample_dir,
+        outdir,
         threads=cfg.threads,
     )
 
     # Cluster reads into ASVs.
     asv_fasta, otutab_tsv = cluster(
         fasta,
-        sample_dir,
+        outdir,
         pident=cfg.cluster_pident,
         threads=cfg.threads,
     )
 
     # Clean up intermediary files.
     fasta.unlink(missing_ok=True)
-    (sample_dir / "centroids.fasta").unlink(missing_ok=True)
+    (outdir / "centroids.fasta").unlink(missing_ok=True)
 
     # Run SINTAX classification.
-    sintax_tsv = run_sintax(
-        asv_fasta, database, sample_dir, cfg.kmer_size, cfg.window_size
-    )
+    sintax_tsv = run_sintax(asv_fasta, database, outdir, cfg.kmer_size, cfg.window_size)
 
     # Optionally run BLAST on ASVs that SINTAX couldn't classify.
     blast_df = None
+    blast_tsv = None
+
     if cfg.blast:
         parsed_df = parse_sintax_tsv(sintax_tsv, cfg.sintax_threshold)
         unclassified_asvs = get_unclassified_asvs(parsed_df)
 
         if unclassified_asvs:
             log.info(f"Running BLAST on {len(unclassified_asvs)} unclassified ASVs.")
-            unclassified_fasta = sample_dir / "unclassified_asvs.fasta"
+            unclassified_fasta = outdir / "unclassified_asvs.fasta"
             write_subset_fasta(asv_fasta, unclassified_asvs, unclassified_fasta)
 
             blast_df = run_blast(
                 unclassified_fasta,
                 database,
-                sample_dir,
+                outdir,
                 pident=cfg.blast_pident,
                 qcov=cfg.blast_qcov,
                 threads=cfg.threads,
             )
-            blast_df.to_csv(sample_dir / "blast_hits.tsv", sep="\t", index=False)
+            blast_tsv = outdir / "blast_hits.tsv"
+            blast_df.to_csv(blast_tsv, sep="\t", index=False)
 
             unclassified_fasta.unlink(missing_ok=True)
         else:
             log.info("No unclassified ASVs — skipping BLAST.")
 
     # Generate results (merges BLAST if available) and visualizations.
-    agg_df = classify(
-        sintax_tsv, otutab_tsv, cfg.sintax_threshold, sample_dir, blast_df=blast_df
+    agg_df, plots = classify(
+        sintax_tsv, otutab_tsv, cfg.sintax_threshold, outdir, blast_df=blast_df
     )
-    agg_df["sample_name"] = sample_name
 
-    return agg_df
+    agg_tsv = outdir / "agg.tsv"
+    agg_df.to_csv(agg_tsv, sep="\t", index=False)
+
+    return asv_fasta, otutab_tsv, agg_tsv, blast_tsv, plots
+
+
+def copy(file_paths: list[Path | None], target_dir: Path) -> None:
+    for f in file_paths:
+        if f is not None:
+            shutil.copy(f, target_dir)
 
 
 def main(
-    fastqs: list[Path],
+    fastq: Path,
     database: Path,
     outdir: Path,
     cfg: PipelineConfig,
 ) -> None:
-    for fastq in fastqs:
-        run_sample(fastq, database, outdir, cfg)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        asv_fasta, otutab_tsv, agg_tsv, blast_tsv, plots = run_sample(
+            fastq, database, Path(temp_dir), cfg
+        )
+
+        copy([asv_fasta, otutab_tsv, agg_tsv, blast_tsv, *plots], outdir)
 
 
 if __name__ == "__main__":
@@ -116,11 +127,12 @@ if __name__ == "__main__":
     )
 
     # Required arguments.
+    parser.add_argument("-f", "--fastq", help="Path to fastq file", required=True)
     parser.add_argument(
-        "-f", "--fastq", nargs="+", help="Path to fastq file(s)", required=True
-    )
-    parser.add_argument(
-        "-d", "--database", help="Path to database fasta (default: $DB_PATH)", default=None
+        "-d",
+        "--database",
+        help="Path to database fasta (default: $DB_PATH)",
+        default=None,
     )
     parser.add_argument("-o", "--outdir", required=True)
 
@@ -179,10 +191,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    fastq = [_file(f, ALLOWED_FASTQ_ENDINGS) for f in args.fastq]
+    fastq = _file(args.fastq, ALLOWED_FASTQ_ENDINGS)
     db_arg = args.database or os.environ.get("DB_PATH")
     if db_arg is None:
-        parser.error("--database is required when DB_PATH environment variable is not set")
+        parser.error(
+            "--database is required when DB_PATH environment variable is not set"
+        )
     database = _file(db_arg, ALLOWED_FASTA_ENDINGS)
 
     outdir = Path(args.outdir)
