@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,9 +28,6 @@ class PipelineConfig:
     blast: bool = False
     blast_pident: float = 0.70
     blast_qcov: float = 0.70
-    min_len: int = 1200
-    max_len: int = 1700
-    max_error: float = 0.05
     cluster_pident: float = 0.80
     threads: int = 8
 
@@ -48,9 +46,6 @@ def run_sample(
     fasta = preprocess(
         fastq,
         sample_dir,
-        min_len=cfg.min_len,
-        max_len=cfg.max_len,
-        max_error=cfg.max_error,
         threads=cfg.threads,
     )
 
@@ -125,23 +120,9 @@ if __name__ == "__main__":
         "-f", "--fastq", nargs="+", help="Path to fastq file(s)", required=True
     )
     parser.add_argument(
-        "-d", "--database", help="Path to database fasta", required=True
+        "-d", "--database", help="Path to database fasta (default: $DB_PATH)", default=None
     )
     parser.add_argument("-o", "--outdir", required=True)
-
-    # Preprocessing (fastq_rs).
-    parser.add_argument(
-        "--min-len", type=int, default=1200, help="Minimum read length (default: 1200)"
-    )
-    parser.add_argument(
-        "--max-len", type=int, default=1700, help="Maximum read length (default: 1700)"
-    )
-    parser.add_argument(
-        "--max-error",
-        type=float,
-        default=0.05,
-        help="Maximum error rate (default: 0.05)",
-    )
 
     # Clustering (usearch).
     parser.add_argument(
@@ -199,7 +180,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     fastq = [_file(f, ALLOWED_FASTQ_ENDINGS) for f in args.fastq]
-    database = _file(args.database, ALLOWED_FASTA_ENDINGS)
+    db_arg = args.database or os.environ.get("DB_PATH")
+    if db_arg is None:
+        parser.error("--database is required when DB_PATH environment variable is not set")
+    database = _file(db_arg, ALLOWED_FASTA_ENDINGS)
 
     outdir = Path(args.outdir)
     outdir.mkdir(exist_ok=True)
@@ -211,9 +195,6 @@ if __name__ == "__main__":
         blast=args.blast,
         blast_pident=args.blast_pident,
         blast_qcov=args.blast_qcov,
-        min_len=args.min_len,
-        max_len=args.max_len,
-        max_error=args.max_error,
         cluster_pident=args.cluster_pident,
         threads=args.threads,
     )

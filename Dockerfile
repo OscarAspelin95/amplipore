@@ -33,9 +33,10 @@ COPY --from=builder /usr/local/bin/fastq_rs /usr/local/bin/fastq_rs
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-ENV UV_COMPILE_BYTECODE=1
-ENV UV_LINK_MODE=copy
-ENV PATH="/usr/src/app/.venv/bin:$PATH"
+ENV	DB_PATH="/usr/src/db/db.fasta" \
+	UV_COMPILE_BYTECODE=1 \
+	UV_LINK_MODE=copy \
+	PATH="/usr/src/app/.venv/bin:$PATH"
 
 COPY ./pyproject.toml ./uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project \
@@ -49,5 +50,15 @@ RUN uv sync --frozen --no-dev --no-install-project \
 	&& wget https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/"${BLAST_VERSION}"/ncbi-blast-"${BLAST_VERSION}"+-x64-linux.tar.gz \
 	&& tar -xf ncbi-blast-"${BLAST_VERSION}"+-x64-linux.tar.gz \
 	&& cp ncbi-blast-"${BLAST_VERSION}"+/bin/* /usr/local/bin/ \
-	#
+	# Remove dependencies
 	&& rm -r /usr/src/deps
+
+
+COPY ./app /usr/src/app/
+
+# Download database
+RUN mkdir -p /usr/src/db \
+	&& mkdir -p /tmp/db \
+	&& uv run python3 database.py --outdir /tmp/db \
+	&& cp /tmp/db/db.fasta ${DB_PATH} \
+	&& rm -r /tmp/db
